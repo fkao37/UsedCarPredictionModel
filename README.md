@@ -1,4 +1,4 @@
-# UsedCarPredictionModel
+# Used Car Prediction Model
 ## Overview
 Automobiles offering convenience, freedom, and mobility, are an essential and irreplaceable part of everyday life.  The significance of cars extends beyond mere transportation; they also symbolize personal status and identity. However, with the myriad of manufacturers, car models, and features available, it can be challenging for customers to make informed decisions. The sheer variety of options can be overwhelming, leading to difficulty in choosing the right vehicle that suits their needs and preferences.
 
@@ -37,7 +37,7 @@ The dataset is a tabular, comma delimited, excel (.csv) file, where each row rep
         <th>Type</th>
         <th>Description</th>
         <th>Sample Values</th>
-        <th>Unique Values</th>
+        <th>Good Values</th>
     </tr>
     <tr>
         <td>id</td>
@@ -166,3 +166,95 @@ The dataset is a tabular, comma delimited, excel (.csv) file, where each row rep
         <td>426880</td>
     </tr>
 </table>
+
+## Data Preprocessing
+The data is preprocessed to prepare it for modeling.
+1.  Remove missing, null.
+2.  Remove bad data, where price = 0
+3.  Standardize the entire dataset to 'lower case'
+4.  Remove unusable features
+
+<table>
+    <th>Usable Rows</th>
+    <th>32,496</th>
+    <th>Features</th>
+    <th>18</th>
+</table>
+
+## Features Analysis - Mutual Importance Score
+* target feature: price
+* id, VIN features are independent and unique for each vehicle and have no influence on its price, and therefore removed from the dataset
+
+The remaining features of the dataset are analyzed with the objective to reduce the number of features to use for regression, a <b>Mutual Information Score</b> is performed for every feature vs the target feature: price, and shown in the following diagram.  A odometer reading cluster breakdown vs car price is also shown.
+
+![mi_scores](https://github.com/fkao37/UsedCarPredictionModel/assets/391381/21785032-02f0-49e6-8744-2bc84171e705)
+
+![odometer_range_price](https://github.com/fkao37/UsedCarPredictionModel/assets/391381/800d4e74-0086-4d35-847c-5b5bd3199dcc)
+
+All none numeric fields are label encoded.  The odometer feature is range encoded for group computation.
+From the Mutual Importance score, and not surprising, the odometer, the model, and the year of the vehicle are the top features that influences the price of the car. 
+Vehicle with lower odometer milages tend to have higher prices.
+
+## Price Prediction Model
+Create pipeline to transform each features:
+
+    a. Odometer: RangeEncode, assign numerical values for the various ranges
+    
+    b. All remaining non-numeric features: OrdinalEncode, with numerical values assigned on first-come-first-serve bases for each unique values in the feature
+
+Perfrom run_model() function to find the best model estimator, where:
+    
+    a. Dataset is split up X_train: 80%, X_dev: 19%, X_test: 1%
+    
+    b. setup grid search parameters:
+        
+        1. PolynomialFeatures, with features_degree=[1,2,3]
+        
+        2. SequentialFeatures, with features_to_select=[3,5,9], selector_direction=['forward']
+        
+        3. alpha = [0.01,0.1,1.0,5.0,10.0]
+    
+    c. Setup Process Pipeline:
+        
+        1. PolynomialFeatures(), expand features
+        
+        2. SequentialFeatureSelector(), to select the best features
+        
+        3. Lasso(), or Ridge() regularization, 
+    
+    d. Perform GridSearchCV() to find best estimator
+        
+        1. cv = 5 fold for validation
+        
+        2. scoring = 'r2', variance scoring
+        
+        3. error_score = 'raise'
+    
+    e. List best model's feature selected, and r2 score
+
+## Model Results
+The model results are tabulated in the following tables. For the selected top feature selected, due to the PolynomialFeatures of cross-multiplcation between polynomial degrees and with other features, for brevity, only the dataset's captured features are listed.  Note that these features only listed that they are important features influencing the price of the car, and not necessary in the order of importance.  This is again due to the PolynomialFeatures.
+
+![model_results](https://github.com/fkao37/UsedCarPredictionModel/assets/391381/72ac40e1-5367-4dd2-b722-f4512f89d245)
+![model_results (1)](https://github.com/fkao37/UsedCarPredictionModel/assets/391381/cf594e06-0b62-43cd-8b93-e323ba62bd04)
+![model_results (2)](https://github.com/fkao37/UsedCarPredictionModel/assets/391381/17c81a38-03f6-42f1-8347-3ecbea397a0e)
+![model_results (3)](https://github.com/fkao37/UsedCarPredictionModel/assets/391381/fd84a304-9177-4756-a10d-1b739f33b601)
+
+## Result Analysis
+Two models are created using different regularization model, Ridge, and Lasso and their model performace result used for comparsion. The first run results uses the entire data set and generates the model on a National level, and model performance data listed in the first row.  Both Ridge and Lasso end up selecting the same key features with Ridge regularization having a better performance of variance score r2 of 63.2% vs 57.9%, both well above the 50% common acceptable variance level.
+
+Deeper analysis of the dataset discovered the imbalance dataset source from different regions.  For example for the state of california there are more data samples than that from Hawaii.  A second run is performed first by isolating the data for the state, and then execute the model against the filtered data set.  The model variance score, and top features selected are listed in the results table.
+
+Not surprisingly, variance score varies highly between each state.  This can be explained due to the lack of sufficient traning and test data for the state.  For each state, same as in the National run, the Lasso regression result lags slightly behind the Ridge model in terms of model performance.
+
+# Conclusion
+
+The Ridge based regularization model performs slightly better than that of the Lasso regularization.  The crucial features in predicting used cars are: 
+Year, fuel type, tranmission type, odometer reading, type of drive (fwd, rwd, ...), and the number of cylinders.  Based on the dataset, the model is able to account for 63% (Ridge) for the entire data, or at the National level.
+However, on a regional and state level, the model variance score vary drastically between states.  This is mainly due to the lack of data, and diversity of the data for each state.  However, important key features important for predicting price can be used as reference for further data acquistion needs.  Therefore, for states with r2 score lower than the National r2 score, use the National model, otherwise, use the state specific model for more accurate prediction.
+
+
+
+
+
+
